@@ -17,9 +17,10 @@ Register and rename apps in the UI. The list is saved on disk and still launches
 - **+ Category** — add a folder in the list. Rename or delete it from the folder header
 - **Rename** on each entry — display name changes immediately; the command stays as shown unless you edit that field
 - **Delete** on each entry, and on a category (a category delete also removes the apps inside it, after a confirm)
+- **GrokBuild Commands** — add a reference row, add a category, or delete either one. Every delete asks first. Edits stay in the browser and are not launched
 - Folders and the Grok Build reference headings collapse. The choice stays in the browser
 - Search across the command list and the reference pane
-- Resizable panes. The right pane is a generic Grok Build command reference (display only)
+- Resizable panes
 - Always-visible vertical scrollbar on the command list
 - Binds to `127.0.0.1` only
 

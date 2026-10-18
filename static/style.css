@@ -673,6 +673,24 @@ body.pane-resizing * {
   border-bottom: 1px solid var(--border);
 }
 
+.cheatsheet-header-row {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.cheatsheet-actions {
+  display: flex;
+  flex-shrink: 0;
+  gap: 6px;
+}
+
+.cheatsheet-actions .btn {
+  padding: 4px 8px;
+  font-size: 11px;
+}
+
 .cheatsheet-title {
   font-size: 13px;
   font-weight: 600;
@@ -696,12 +714,23 @@ body.pane-resizing * {
   margin-bottom: 4px;
 }
 
+.cheatsheet-category-head {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  width: calc(100% - 20px);
+  margin: 10px 10px 4px;
+  position: sticky;
+  top: 0;
+  z-index: 1;
+}
+
 .cheatsheet-category-title {
   display: flex;
   align-items: center;
   gap: 8px;
-  width: calc(100% - 20px);
-  margin: 10px 10px 4px;
+  flex: 1;
+  min-width: 0;
   padding: 7px 10px;
   border: none;
   border-left: 3px solid var(--accent);
@@ -719,9 +748,12 @@ body.pane-resizing * {
   text-transform: none;
   text-shadow: 0 0 12px rgba(255, 45, 149, 0.35);
   cursor: pointer;
-  position: sticky;
-  top: 0;
-  z-index: 1;
+}
+
+.cheatsheet-row-top {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
 }
 
 .cheatsheet-row {
@@ -738,6 +770,8 @@ body.pane-resizing * {
 }
 
 .cheatsheet-need {
+  flex: 1;
+  min-width: 0;
   font-size: 12px;
   font-weight: 500;
   color: var(--text);

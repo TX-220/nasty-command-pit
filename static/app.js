@@ -10,6 +10,8 @@ const state = {
   categoryEditorId: null,
   collapsed: new Set(),
   sheetCollapsed: new Set(),
+  sheet: [],
+  sheetMode: "item",
 };
 
 const els = {
@@ -50,6 +52,22 @@ const els = {
   log: document.getElementById("log"),
   toast: document.getElementById("toast"),
   cheatsheetList: document.getElementById("cheatsheet-list"),
+  btnSheetAdd: document.getElementById("btn-sheet-add"),
+  btnSheetCategory: document.getElementById("btn-sheet-category"),
+  sheetModal: document.getElementById("sheet-modal"),
+  sheetForm: document.getElementById("sheet-form"),
+  sheetTitle: document.getElementById("sheet-title"),
+  sheetHint: document.getElementById("sheet-hint"),
+  sheetName: document.getElementById("sheet-name"),
+  sheetNameLabel: document.getElementById("sheet-name-label"),
+  sheetCmd: document.getElementById("sheet-cmd"),
+  sheetCmdField: document.getElementById("sheet-cmd-field"),
+  sheetCategory: document.getElementById("sheet-category"),
+  sheetCatField: document.getElementById("sheet-cat-field"),
+  sheetNewCat: document.getElementById("sheet-newcat"),
+  sheetNewCatField: document.getElementById("sheet-newcat-field"),
+  sheetError: document.getElementById("sheet-error"),
+  sheetSave: document.getElementById("sheet-save"),
   search: document.getElementById("search-input"),
   btnClearSearch: document.getElementById("btn-clear-search"),
 };
@@ -150,23 +168,247 @@ function cheatsheetItemMatches(item, cat, query) {
   );
 }
 
+const SHEET_KEY = "vesper-launcher-grok-sheet";
+
+function sheetId(prefix) {
+  const rand = Math.random().toString(36).slice(2, 8);
+  return prefix + "-" + rand;
+}
+
+function defaultSheet() {
+  return GROK_CHEATSHEET.map((cat) => ({
+    id: sheetId("cat"),
+    title: cat.title,
+    items: (cat.items || []).map((item) => ({
+      id: sheetId("item"),
+      need: item.need,
+      cmd: item.cmd,
+    })),
+  }));
+}
+
+function normalizeSheet(raw) {
+  if (!Array.isArray(raw)) return null;
+  const categories = [];
+  for (const cat of raw) {
+    if (!cat || typeof cat.title !== "string") return null;
+    const title = cat.title.trim();
+    if (!title || title.length > 40) return null;
+    if (!Array.isArray(cat.items)) return null;
+    const items = [];
+    for (const item of cat.items) {
+      if (!item || typeof item.need !== "string" || typeof item.cmd !== "string") return null;
+      const need = item.need.trim();
+      const cmd = item.cmd.trim();
+      if (!need || need.length > 80 || !cmd || cmd.length > 500) return null;
+      items.push({
+        id: typeof item.id === "string" && item.id ? item.id : sheetId("item"),
+        need,
+        cmd,
+      });
+    }
+    categories.push({
+      id: typeof cat.id === "string" && cat.id ? cat.id : sheetId("cat"),
+      title,
+      items,
+    });
+  }
+  return categories;
+}
+
+function loadSheet() {
+  try {
+    const raw = JSON.parse(localStorage.getItem(SHEET_KEY) || "null");
+    const categories = normalizeSheet(raw);
+    if (categories) {
+      state.sheet = categories;
+      return;
+    }
+  } catch {
+    /* fall through to the built-in reference */
+  }
+  state.sheet = defaultSheet();
+}
+
+function saveSheet() {
+  localStorage.setItem(SHEET_KEY, JSON.stringify(state.sheet));
+}
+
+function findSheetCategory(categoryId) {
+  return state.sheet.find((cat) => cat.id === categoryId) || null;
+}
+
+function showSheetError(message) {
+  if (!els.sheetError) return;
+  if (!message) {
+    els.sheetError.textContent = "";
+    els.sheetError.classList.add("hidden");
+    return;
+  }
+  els.sheetError.textContent = message;
+  els.sheetError.classList.remove("hidden");
+}
+
+function fillSheetCategories(selectedId) {
+  const select = els.sheetCategory;
+  if (!select) return;
+  select.innerHTML = "";
+  for (const cat of state.sheet) {
+    const option = document.createElement("option");
+    option.value = cat.id;
+    option.textContent = cat.title;
+    select.appendChild(option);
+  }
+  if (selectedId && findSheetCategory(selectedId)) select.value = selectedId;
+}
+
+function openSheetItem() {
+  state.sheetMode = "item";
+  els.sheetTitle.textContent = "Add reference";
+  els.sheetHint.textContent = "Saved in this browser. It is not run from this pane.";
+  els.sheetNameLabel.textContent = "Name";
+  els.sheetName.maxLength = 80;
+  els.sheetName.value = "";
+  els.sheetCmd.value = "";
+  els.sheetCmd.required = true;
+  els.sheetNewCat.value = "";
+  els.sheetCmdField.classList.remove("hidden");
+  els.sheetCatField.classList.remove("hidden");
+  els.sheetNewCatField.classList.remove("hidden");
+  fillSheetCategories(state.sheet[0] ? state.sheet[0].id : "");
+  showSheetError("");
+  els.sheetModal.classList.remove("hidden");
+  els.sheetName.focus();
+}
+
+function openSheetCategory() {
+  state.sheetMode = "category";
+  els.sheetTitle.textContent = "Add category";
+  els.sheetHint.textContent = "A folder in GrokBuild Commands. Reference only.";
+  els.sheetNameLabel.textContent = "Name";
+  els.sheetName.maxLength = 40;
+  els.sheetName.value = "";
+  els.sheetCmd.required = false;
+  els.sheetCmdField.classList.add("hidden");
+  els.sheetCatField.classList.add("hidden");
+  els.sheetNewCatField.classList.add("hidden");
+  showSheetError("");
+  els.sheetModal.classList.remove("hidden");
+  els.sheetName.focus();
+}
+
+function closeSheetEditor() {
+  els.sheetModal.classList.add("hidden");
+  showSheetError("");
+}
+
+function sheetNameTaken(name, ignoreId) {
+  const needle = name.toLowerCase();
+  return state.sheet.some((cat) => cat.id !== ignoreId && cat.title.toLowerCase() === needle);
+}
+
+function saveSheetEditor(event) {
+  event.preventDefault();
+  const name = els.sheetName.value.trim();
+  if (!name) {
+    showSheetError("Name is required");
+    return;
+  }
+  if (state.sheetMode === "category") {
+    if (name.length > 40) {
+      showSheetError("Name is too long");
+      return;
+    }
+    if (sheetNameTaken(name)) {
+      showSheetError("That category already exists");
+      return;
+    }
+    state.sheet.push({ id: sheetId("cat"), title: name, items: [] });
+    saveSheet();
+    closeSheetEditor();
+    renderCheatsheet();
+    showToast("Category added", "success");
+    return;
+  }
+
+  const cmd = els.sheetCmd.value.trim();
+  if (!cmd) {
+    showSheetError("Command is required");
+    return;
+  }
+  if (name.length > 80 || cmd.length > 500) {
+    showSheetError("That text is too long");
+    return;
+  }
+  let category = null;
+  const fresh = els.sheetNewCat.value.trim();
+  if (fresh) {
+    if (fresh.length > 40) {
+      showSheetError("Category name is too long");
+      return;
+    }
+    if (sheetNameTaken(fresh)) {
+      showSheetError("That category already exists");
+      return;
+    }
+    category = { id: sheetId("cat"), title: fresh, items: [] };
+    state.sheet.push(category);
+  } else {
+    category = findSheetCategory(els.sheetCategory.value) || state.sheet[0] || null;
+    if (!category) {
+      category = { id: sheetId("cat"), title: "Custom", items: [] };
+      state.sheet.push(category);
+    }
+  }
+  category.items.push({ id: sheetId("item"), need: name, cmd });
+  saveSheet();
+  closeSheetEditor();
+  renderCheatsheet();
+  showToast("Reference added", "success");
+}
+
+function deleteSheetItem(cat, item) {
+  const label = item.need || "this command";
+  if (!window.confirm(`Delete "${label}" from GrokBuild Commands?`)) return;
+  cat.items = cat.items.filter((row) => row.id !== item.id);
+  saveSheet();
+  renderCheatsheet();
+  showToast("Deleted", "success");
+}
+
+function deleteSheetCategory(cat) {
+  const count = (cat.items || []).length;
+  const message = count
+    ? `Delete category "${cat.title}" and its ${count} command${count === 1 ? "" : "s"}?`
+    : `Delete empty category "${cat.title}"?`;
+  if (!window.confirm(message)) return;
+  state.sheet = state.sheet.filter((row) => row.id !== cat.id);
+  state.sheetCollapsed.delete(cat.title);
+  saveCollapsed();
+  saveSheet();
+  renderCheatsheet();
+  showToast("Category deleted", "success");
+}
+
 function renderCheatsheet() {
   const root = els.cheatsheetList;
   if (!root) return;
   root.innerHTML = "";
 
   const query = normalizeQuery(state.query);
-  let shown = 0;
   let sections = 0;
 
-  for (const cat of GROK_CHEATSHEET) {
+  for (const cat of state.sheet) {
     const items = (cat.items || []).filter((item) => cheatsheetItemMatches(item, cat, query));
-    if (items.length === 0) continue;
+    if (query && items.length === 0) continue;
 
     sections += 1;
     const collapsed = !query && state.sheetCollapsed.has(cat.title);
     const wrap = document.createElement("div");
     wrap.className = "cheatsheet-category";
+
+    const head = document.createElement("div");
+    head.className = "cheatsheet-category-head";
 
     const title = document.createElement("button");
     title.type = "button";
@@ -186,7 +428,17 @@ function renderCheatsheet() {
     title.appendChild(chevron);
     title.appendChild(name);
     title.addEventListener("click", () => toggleSheet(cat.title));
-    wrap.appendChild(title);
+
+    const removeCat = document.createElement("button");
+    removeCat.type = "button";
+    removeCat.className = "cmd-delete";
+    removeCat.textContent = "Delete";
+    removeCat.title = "Delete category";
+    removeCat.addEventListener("click", () => deleteSheetCategory(cat));
+
+    head.appendChild(title);
+    head.appendChild(removeCat);
+    wrap.appendChild(head);
 
     if (collapsed) {
       root.appendChild(wrap);
@@ -197,18 +449,29 @@ function renderCheatsheet() {
       const row = document.createElement("div");
       row.className = "cheatsheet-row";
 
+      const top = document.createElement("div");
+      top.className = "cheatsheet-row-top";
+
       const need = document.createElement("div");
       need.className = "cheatsheet-need";
       need.textContent = item.need;
+
+      const remove = document.createElement("button");
+      remove.type = "button";
+      remove.className = "cmd-delete";
+      remove.textContent = "Delete";
+      remove.title = "Delete " + item.need;
+      remove.addEventListener("click", () => deleteSheetItem(cat, item));
 
       const cmd = document.createElement("div");
       cmd.className = "cheatsheet-cmd";
       cmd.textContent = item.cmd;
 
-      row.appendChild(need);
+      top.appendChild(need);
+      top.appendChild(remove);
+      row.appendChild(top);
       row.appendChild(cmd);
       wrap.appendChild(row);
-      shown += 1;
     }
 
     root.appendChild(wrap);
@@ -1077,8 +1340,21 @@ document.getElementById("category-close").addEventListener("click", () => closeC
 els.categoryModal.addEventListener("click", (event) => {
   if (event.target === els.categoryModal) closeCategoryEditor();
 });
+els.btnSheetAdd.addEventListener("click", () => openSheetItem());
+els.btnSheetCategory.addEventListener("click", () => openSheetCategory());
+els.sheetForm.addEventListener("submit", (event) => saveSheetEditor(event));
+document.getElementById("sheet-cancel").addEventListener("click", () => closeSheetEditor());
+document.getElementById("sheet-close").addEventListener("click", () => closeSheetEditor());
+els.sheetModal.addEventListener("click", (event) => {
+  if (event.target === els.sheetModal) closeSheetEditor();
+});
 document.addEventListener("keydown", (event) => {
   if (event.key !== "Escape") return;
+  if (!els.sheetModal.classList.contains("hidden")) {
+    event.preventDefault();
+    closeSheetEditor();
+    return;
+  }
   if (!els.categoryModal.classList.contains("hidden")) {
     event.preventDefault();
     closeCategoryEditor();
@@ -1092,6 +1368,7 @@ document.addEventListener("keydown", (event) => {
 
 initSearch();
 loadCollapsed();
+loadSheet();
 renderCheatsheet();
 initPaneResizers();
 loadCommands();
