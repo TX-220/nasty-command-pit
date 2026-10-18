@@ -1,0 +1,17 @@
+{
+  "categories": [
+    {
+      "id": "apps",
+      "name": "Apps",
+      "commands": [
+        {
+          "id": "example-echo",
+          "label": "Example echo",
+          "description": "Sample whitelist entry. Copy this file to commands.json and replace it.",
+          "command": ["echo", "hello from Nasty Command Pit"],
+          "cwd": null
+        }
+      ]
+    }
+  ]
+}

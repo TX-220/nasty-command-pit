@@ -1,0 +1,152 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Nasty Command Pit</title>
+  <link rel="icon" href="/static/favicon.svg?v=ncp2" type="image/svg+xml">
+  <link rel="icon" href="/static/favicon.ico" sizes="any">
+  <link rel="apple-touch-icon" href="/static/apple-touch-icon.png">
+  <link rel="stylesheet" href="/static/style.css?v=ncp7">
+</head>
+<body>
+  <div class="app">
+    <header class="topbar">
+      <div class="brand">
+        <span class="brand-icon-wrap" aria-hidden="true">
+          <img class="brand-icon" src="/static/favicon.svg?v=ncp2" width="22" height="22" alt="">
+        </span>
+        <h1>Nasty Command Pit</h1>
+      </div>
+      <div class="topbar-search">
+        <input
+          id="search-input"
+          class="search-input"
+          type="search"
+          placeholder="Search commands…"
+          autocomplete="off"
+          spellcheck="false"
+          aria-label="Search commands"
+        />
+        <button id="btn-clear-search" class="btn btn-ghost search-clear hidden" type="button" title="Clear search">✕</button>
+      </div>
+      <div class="topbar-actions">
+        <button id="btn-add" class="btn btn-primary" type="button" title="Register a new app">+ Add</button>
+        <button id="btn-add-category" class="btn btn-secondary" type="button" title="Add a category folder">+ Category</button>
+        <button id="btn-reload" class="btn btn-secondary" type="button" title="Reload commands.json">Reload</button>
+      </div>
+    </header>
+
+    <div class="main">
+      <div class="sidebar-panel" id="sidebar-panel">
+        <aside class="sidebar">
+          <div id="command-list" class="command-list"></div>
+          <div class="sidebar-footer">
+            <span id="command-count" class="command-count"></span>
+          </div>
+        </aside>
+        <div
+          class="pane-resizer"
+          id="sidebar-resizer"
+          title="Drag to resize · double-click to reset"
+          aria-label="Resize left pane"
+        ></div>
+      </div>
+
+      <main class="detail" id="detail">
+        <div class="empty-state" id="empty-state">
+          <p>Select a command from the sidebar</p>
+        </div>
+
+        <div class="detail-body hidden" id="detail-body">
+          <div class="detail-content">
+            <section class="detail-header">
+              <div class="detail-title-row">
+                <h2 class="detail-title" id="cmd-label"></h2>
+                <button id="btn-rename" class="btn btn-secondary" type="button">Rename</button>
+                <button id="btn-delete" class="btn btn-danger" type="button">Delete</button>
+              </div>
+              <p id="cmd-description" class="detail-description"></p>
+              <div class="detail-meta">
+                <span class="mono" id="cmd-argv"></span>
+                <span class="mono" id="cmd-cwd"></span>
+              </div>
+            </section>
+
+            <section class="detail-actions">
+              <button id="btn-run" class="btn btn-primary btn-run" type="button" disabled>Run</button>
+              <span class="detail-hint">whitelist only · web apps open in a new tab</span>
+            </section>
+          </div>
+
+          <section class="log-section">
+            <div class="log-header">
+              <span>Output</span>
+              <button id="btn-clear-log" class="btn btn-ghost" type="button">Clear</button>
+            </div>
+            <pre id="log" class="log mono" aria-live="polite"></pre>
+          </section>
+        </div>
+      </main>
+
+      <div class="cheatsheet-wrap" id="cheatsheet-wrap">
+        <div
+          class="pane-resizer"
+          id="cheatsheet-resizer"
+          title="Drag to resize · double-click to reset"
+          aria-label="Resize right pane"
+        ></div>
+        <aside class="cheatsheet-panel" id="cheatsheet-panel" aria-label="GrokBuild Commands">
+          <div class="cheatsheet-header">
+            <h2 class="cheatsheet-title">GrokBuild Commands</h2>
+            <p class="cheatsheet-hint">reference only · not runnable here</p>
+          </div>
+          <div id="cheatsheet-list" class="cheatsheet-list"></div>
+        </aside>
+      </div>
+    </div>
+
+    <div id="toast" class="toast hidden"></div>
+
+    <div id="editor-modal" class="modal-overlay hidden" role="dialog" aria-modal="true" aria-labelledby="editor-title">
+      <form id="editor-form" class="modal-panel">
+        <div class="modal-header">
+          <h2 id="editor-title">Add app</h2>
+          <button id="editor-close" class="btn btn-ghost" type="button" aria-label="Close">✕</button>
+        </div>
+        <p class="modal-hint" id="editor-hint">Saved in commands.json. The command is stored as arguments, not a shell line.</p>
+        <label class="field"><span>Display name</span><input id="ed-label" name="label" required maxlength="80" autocomplete="off"></label>
+        <label class="field"><span>Command</span><input id="ed-command" name="command" required maxlength="2000" spellcheck="false" autocomplete="off" placeholder="my-app --flag &quot;path with spaces&quot;"></label>
+        <label class="field"><span>Category</span><select id="ed-category" name="category"></select></label>
+        <label class="field"><span>New category (optional)</span><input id="ed-newcat" name="new_category" maxlength="40" autocomplete="off" placeholder="Leave empty to use the category above"></label>
+        <label class="field"><span>Working directory (optional)</span><input id="ed-cwd" name="cwd" maxlength="500" spellcheck="false" autocomplete="off" placeholder="~/projects/example"></label>
+        <label class="field"><span>Description (optional)</span><input id="ed-description" name="description" maxlength="400" autocomplete="off"></label>
+        <label class="field"><span>Open URL (optional)</span><input id="ed-url" name="open_url" maxlength="500" spellcheck="false" autocomplete="off" placeholder="http://127.0.0.1:8080/"></label>
+        <label class="check"><input id="ed-detach" name="detach" type="checkbox"> Run in background</label>
+        <p id="editor-error" class="form-error hidden"></p>
+        <div class="modal-actions">
+          <button id="editor-cancel" class="btn btn-secondary" type="button">Cancel</button>
+          <button id="editor-save" class="btn btn-primary" type="submit">Save</button>
+        </div>
+      </form>
+    </div>
+
+    <div id="category-modal" class="modal-overlay hidden" role="dialog" aria-modal="true" aria-labelledby="category-title">
+      <form id="category-form" class="modal-panel">
+        <div class="modal-header">
+          <h2 id="category-title">Add category</h2>
+          <button id="category-close" class="btn btn-ghost" type="button" aria-label="Close">✕</button>
+        </div>
+        <p class="modal-hint">A folder in the list. Apps stay inside it until you move or delete them.</p>
+        <label class="field"><span>Name</span><input id="cat-name" name="name" required maxlength="40" autocomplete="off"></label>
+        <p id="category-error" class="form-error hidden"></p>
+        <div class="modal-actions">
+          <button id="category-cancel" class="btn btn-secondary" type="button">Cancel</button>
+          <button id="category-save" class="btn btn-primary" type="submit">Save</button>
+        </div>
+      </form>
+    </div>
+  </div>
+  <script src="/static/app.js?v=ncp7"></script>
+</body>
+</html>
